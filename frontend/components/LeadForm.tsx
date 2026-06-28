@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { submitLead, LeadSubmitError, type LeadResponse } from "@/lib/api";
 import {
   ALLOWED_RESUME_EXTENSIONS,
   MAX_RESUME_MB,
@@ -13,38 +14,99 @@ import {
 
 const ACCEPT = ALLOWED_RESUME_EXTENSIONS.map((e) => `.${e}`).join(",");
 
+type Status = "idle" | "submitting" | "success" | "error";
+
 export default function LeadForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [resume, setResume] = useState<ResumeMetadata | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<LeadFormErrors>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [result, setResult] = useState<LeadResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const resume: ResumeMetadata | null = resumeFile
+    ? toResumeMetadata(resumeFile)
+    : null;
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    setResume(file ? toResumeMetadata(file) : null);
-    setSubmitted(false);
+    setResumeFile(e.target.files?.[0] ?? null);
+    setStatus("idle");
+    setSubmitError(null);
   }
 
   function clearFile() {
-    setResume(null);
+    setResumeFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function resetForm() {
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    clearFile();
+    setErrors({});
+    setStatus("idle");
+    setSubmitError(null);
+    setResult(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const values = { firstName, lastName, email, resume };
-    const nextErrors = validateLeadForm(values);
+    setSubmitError(null);
+
+    const nextErrors = validateLeadForm({ firstName, lastName, email, resume });
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length === 0) {
-      // Backend is intentionally not wired up yet.
-      setSubmitted(true);
-    } else {
-      setSubmitted(false);
+    if (Object.keys(nextErrors).length > 0 || !resumeFile) {
+      setStatus("error");
+      return;
+    }
+
+    setStatus("submitting");
+    try {
+      const lead = await submitLead({
+        firstName,
+        lastName,
+        email,
+        resume: resumeFile,
+      });
+      setResult(lead);
+      setStatus("success");
+    } catch (err) {
+      const message =
+        err instanceof LeadSubmitError
+          ? err.message
+          : "Something went wrong. Please try again.";
+      setSubmitError(message);
+      setStatus("error");
     }
   }
+
+  if (status === "success" && result) {
+    return (
+      <div
+        role="status"
+        className="rounded-lg border border-emerald-300 bg-emerald-50 p-5 text-sm text-emerald-900"
+      >
+        <p className="text-base font-semibold">Application received</p>
+        <p className="mt-1">
+          Thanks, {result.first_name}. We&apos;ve saved your details and
+          resume, and we&apos;ll be in touch at {result.email}.
+        </p>
+        <button
+          type="button"
+          onClick={resetForm}
+          className="mt-4 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100"
+        >
+          Submit another application
+        </button>
+      </div>
+    );
+  }
+
+  const submitting = status === "submitting";
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -55,6 +117,7 @@ export default function LeadForm() {
         onChange={setFirstName}
         error={errors.firstName}
         autoComplete="given-name"
+        disabled={submitting}
       />
       <Field
         id="lastName"
@@ -63,6 +126,7 @@ export default function LeadForm() {
         onChange={setLastName}
         error={errors.lastName}
         autoComplete="family-name"
+        disabled={submitting}
       />
       <Field
         id="email"
@@ -72,6 +136,7 @@ export default function LeadForm() {
         onChange={setEmail}
         error={errors.email}
         autoComplete="email"
+        disabled={submitting}
       />
 
       <div>
@@ -88,9 +153,10 @@ export default function LeadForm() {
           type="file"
           accept={ACCEPT}
           onChange={handleFileChange}
+          disabled={submitting}
           aria-invalid={errors.resume ? "true" : undefined}
           aria-describedby={errors.resume ? "resume-error" : "resume-hint"}
-          className="block w-full cursor-pointer rounded-lg border border-gray-300 bg-white text-sm text-gray-700 file:mr-4 file:cursor-pointer file:border-0 file:bg-gray-100 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+          className="block w-full cursor-pointer rounded-lg border border-gray-300 bg-white text-sm text-gray-700 file:mr-4 file:cursor-pointer file:border-0 file:bg-gray-100 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200 disabled:opacity-60"
         />
         <p id="resume-hint" className="mt-1.5 text-xs text-gray-500">
           Accepted: {ALLOWED_RESUME_EXTENSIONS.join(", ")} · Max {MAX_RESUME_MB}{" "}
@@ -116,7 +182,8 @@ export default function LeadForm() {
               <button
                 type="button"
                 onClick={clearFile}
-                className="shrink-0 text-xs font-medium text-gray-500 underline hover:text-gray-800"
+                disabled={submitting}
+                className="shrink-0 text-xs font-medium text-gray-500 underline hover:text-gray-800 disabled:opacity-60"
               >
                 Remove
               </button>
@@ -133,21 +200,18 @@ export default function LeadForm() {
 
       <button
         type="submit"
-        className="w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+        disabled={submitting}
+        className="w-full rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Submit application
+        {submitting ? "Submitting…" : "Submit"}
       </button>
 
-      {submitted && (
+      {submitError && (
         <div
-          role="status"
-          className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+          role="alert"
+          className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800"
         >
-          <p className="font-semibold">Form is valid.</p>
-          <p className="mt-1">
-            Backend integration is not wired up yet, so nothing was sent. This
-            confirms the form and validation are working.
-          </p>
+          {submitError}
         </div>
       )}
     </form>
@@ -162,6 +226,7 @@ interface FieldProps {
   error?: string;
   type?: string;
   autoComplete?: string;
+  disabled?: boolean;
 }
 
 function Field({
@@ -172,6 +237,7 @@ function Field({
   error,
   type = "text",
   autoComplete,
+  disabled,
 }: FieldProps) {
   return (
     <div>
@@ -187,10 +253,11 @@ function Field({
         type={type}
         value={value}
         autoComplete={autoComplete}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? "true" : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+        className={`block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-60 ${
           error
             ? "border-red-400 focus:ring-red-400"
             : "border-gray-300 focus:ring-gray-900"
