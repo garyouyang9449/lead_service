@@ -3,12 +3,21 @@ from __future__ import annotations
 import io
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_storage
+from app.api.deps import get_db, get_email, get_storage
 from app.schemas.lead import LeadCreate, LeadDetail, LeadRead, LeadStateUpdate
+from app.services.email import EmailService, render_prospect_confirmation
 from app.services.leads import (
     FileValidationError,
     InvalidStateTransition,
@@ -25,12 +34,14 @@ router = APIRouter(prefix="/api/leads", tags=["leads"])
 
 @router.post("", status_code=201, response_model=LeadRead)
 async def submit_lead(
+    background_tasks: BackgroundTasks,
     first_name: str = Form(...),
     last_name: str = Form(...),
     email: str = Form(...),
     resume: UploadFile = File(...),
     db: Session = Depends(get_db),
     storage: StorageService = Depends(get_storage),
+    mailer: EmailService = Depends(get_email),
 ) -> LeadRead:
     try:
         data = LeadCreate(first_name=first_name, last_name=last_name, email=email)
@@ -52,6 +63,12 @@ async def submit_lead(
         )
     except FileValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    prospect_subject, prospect_body = render_prospect_confirmation(lead)
+    background_tasks.add_task(
+        mailer.send, lead.email, prospect_subject, prospect_body
+    )
+    # TODO: notify the internal attorney of the new lead submission.
 
     return LeadRead.model_validate(lead)
 

@@ -50,15 +50,29 @@ def fake_storage():
     return FakeStorage()
 
 
+class FakeEmail:
+    def __init__(self):
+        self.sent: list[tuple[str, str, str]] = []
+
+    def send(self, to, subject, body):
+        self.sent.append((to, subject, body))
+
+
 @pytest.fixture
-def client(db_session, fake_storage):
+def fake_email():
+    return FakeEmail()
+
+
+@pytest.fixture
+def client(db_session, fake_storage, fake_email):
     from fastapi.testclient import TestClient
 
-    from app.api.deps import get_db, get_storage
+    from app.api.deps import get_db, get_email, get_storage
     from app.main import create_app
 
     app = create_app()
     app.dependency_overrides[get_db] = lambda: db_session
     app.dependency_overrides[get_storage] = lambda: fake_storage
+    app.dependency_overrides[get_email] = lambda: fake_email
     with TestClient(app) as c:
         yield c

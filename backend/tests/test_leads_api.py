@@ -25,6 +25,16 @@ def test_create_lead_happy_path(client, fake_storage):
     assert len(fake_storage.objects) == 1
 
 
+def test_create_lead_sends_prospect_confirmation_email(client, fake_email):
+    resp = client.post(
+        "/api/leads", data=_fields(email="ada@calc.org"), files=_multipart()
+    )
+    assert resp.status_code == 201, resp.text
+
+    recipients = [to for to, _, _ in fake_email.sent]
+    assert recipients == ["ada@calc.org"]
+
+
 def test_create_lead_rejects_bad_extension(client):
     resp = client.post(
         "/api/leads",
