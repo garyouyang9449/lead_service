@@ -10,6 +10,10 @@ Stack: **FastAPI** (API) · **Next.js** App Router (web) · **Postgres** (data) 
 
 See [`docs/design.md`](docs/design.md) for the full system design.
 
+## Demo
+
+https://github.com/garyouyang9449/lead_service/releases/download/demo/lead-service-demo.mov
+
 ---
 
 ## Quick start (Docker — recommended)
