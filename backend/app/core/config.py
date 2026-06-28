@@ -10,13 +10,18 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60
     jwt_algorithm: str = "HS256"
 
-    default_attorney_email: str = "attorney@firm.test"
+    frontend_origin: str = "http://localhost:3000"
+    cookie_name: str = "access_token"
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
+
+    default_attorney_email: str = "attorney@firm.com"
     default_attorney_password: str = "password123"
 
     smtp_host: str = "localhost"
     smtp_port: int = 1025
-    email_from: str = "no-reply@firm.test"
-    attorney_email: str = "attorney@firm.test"
+    email_from: str = "no-reply@firm.com"
+    attorney_email: str = "attorney@firm.com"
 
     s3_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "minioadmin"

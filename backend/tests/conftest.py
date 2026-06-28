@@ -1,4 +1,5 @@
 import io
+import uuid
 
 import pytest
 from sqlalchemy import create_engine
@@ -67,6 +68,27 @@ def fake_email():
 def client(db_session, fake_storage, fake_email):
     from fastapi.testclient import TestClient
 
+    from app.api.deps import get_current_user, get_db, get_email, get_storage
+    from app.main import create_app
+    from app.models.user import User
+
+    fake_user = User(id=uuid.uuid4(), email="test-attorney@firm.com",
+                     hashed_password="x")
+
+    app = create_app()
+    app.dependency_overrides[get_db] = lambda: db_session
+    app.dependency_overrides[get_storage] = lambda: fake_storage
+    app.dependency_overrides[get_email] = lambda: fake_email
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture
+def unauthed_client(db_session, fake_storage, fake_email):
+    """Client WITHOUT a get_current_user override — exercises real auth guards."""
+    from fastapi.testclient import TestClient
+
     from app.api.deps import get_db, get_email, get_storage
     from app.main import create_app
 
@@ -76,3 +98,22 @@ def client(db_session, fake_storage, fake_email):
     app.dependency_overrides[get_email] = lambda: fake_email
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture
+def seed_user(db_session):
+    """Create an attorney user with a known password; returns (user, password)."""
+    from app.core.security import hash_password
+    from app.models.user import User
+
+    password = "correct-horse"
+    user = User(
+        id=uuid.uuid4(),
+        email="attorney@firm.com",
+        hashed_password=hash_password(password),
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user, password
+

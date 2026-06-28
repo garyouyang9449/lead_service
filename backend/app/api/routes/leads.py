@@ -15,7 +15,8 @@ from fastapi import (
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_email, get_storage
+from app.api.deps import get_current_user, get_db, get_email, get_storage
+from app.models.user import User
 from app.schemas.lead import LeadCreate, LeadDetail, LeadRead, LeadStateUpdate
 from app.services.email import EmailService, render_prospect_confirmation
 from app.services.leads import (
@@ -78,6 +79,7 @@ def list_all_leads(
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[LeadRead]:
     leads = list_leads(db, limit=limit, offset=offset)
     return [LeadRead.model_validate(lead) for lead in leads]
@@ -88,6 +90,7 @@ def read_lead(
     lead_id: uuid.UUID,
     db: Session = Depends(get_db),
     storage: StorageService = Depends(get_storage),
+    current_user: User = Depends(get_current_user),
 ) -> LeadDetail:
     try:
         return get_lead_detail(db, storage, lead_id)
@@ -100,6 +103,7 @@ def patch_lead(
     lead_id: uuid.UUID,
     payload: LeadStateUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> LeadRead:
     try:
         lead = update_lead_state(db, lead_id, payload.state)
