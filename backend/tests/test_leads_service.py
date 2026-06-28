@@ -10,6 +10,7 @@ from app.services.leads import (
     LeadNotFound,
     create_lead,
     get_lead_detail,
+    list_leads,
     validate_resume,
 )
 
@@ -104,3 +105,49 @@ def test_get_lead_detail_returns_presigned_url(db_session, fake_storage):
 def test_get_lead_detail_missing_raises(db_session, fake_storage):
     with pytest.raises(LeadNotFound):
         get_lead_detail(db_session, fake_storage, uuid.uuid4())
+
+
+# ---- list_leads ----
+
+from datetime import datetime, timedelta, timezone
+
+
+def _make(db, storage, first, created_at=None):
+    data = LeadCreate(first_name=first, last_name="X", email=f"{first}@x.org")
+    lead = create_lead(
+        db, storage, data,
+        filename="r.pdf", content_type="application/pdf",
+        fileobj=_pdf(20), size=20,
+    )
+    if created_at is not None:
+        lead.created_at = created_at
+        db.commit()
+        db.refresh(lead)
+    return lead
+
+
+def test_list_leads_returns_all_newest_first(db_session, fake_storage):
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    a = _make(db_session, fake_storage, "alice", base)
+    b = _make(db_session, fake_storage, "bob", base + timedelta(minutes=1))
+    c = _make(db_session, fake_storage, "carol", base + timedelta(minutes=2))
+
+    result = list_leads(db_session)
+
+    assert [l.id for l in result] == [c.id, b.id, a.id]
+
+
+def test_list_leads_empty(db_session, fake_storage):
+    assert list_leads(db_session) == []
+
+
+def test_list_leads_respects_limit_and_offset(db_session, fake_storage):
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    a = _make(db_session, fake_storage, "alice", base)
+    b = _make(db_session, fake_storage, "bob", base + timedelta(minutes=1))
+    c = _make(db_session, fake_storage, "carol", base + timedelta(minutes=2))
+
+    # newest-first: [carol, bob, alice]; offset 1, limit 1 -> bob
+    page = list_leads(db_session, limit=1, offset=1)
+
+    assert [l.id for l in page] == [b.id]

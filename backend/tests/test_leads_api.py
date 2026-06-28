@@ -70,3 +70,35 @@ def test_get_lead_detail_returns_presigned_url(client):
 def test_get_lead_detail_not_found(client):
     resp = client.get(f"/api/leads/{uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+def test_list_leads_returns_created_leads(client):
+    client.post("/api/leads", data=_fields(email="a@x.org"), files=_multipart())
+    client.post("/api/leads", data=_fields(email="b@x.org"), files=_multipart())
+
+    resp = client.get("/api/leads")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert isinstance(body, list)
+    assert len(body) == 2
+    emails = {l["email"] for l in body}
+    assert emails == {"a@x.org", "b@x.org"}
+    # list items carry full prospect info + state, but no presigned url
+    assert "state" in body[0]
+    assert "resume_filename" in body[0]
+    assert "resume_url" not in body[0]
+
+
+def test_list_leads_empty(client):
+    resp = client.get("/api/leads")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_list_leads_pagination(client):
+    for i in range(3):
+        client.post("/api/leads", data=_fields(email=f"u{i}@x.org"), files=_multipart())
+
+    resp = client.get("/api/leads?limit=2&offset=0")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2

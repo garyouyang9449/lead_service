@@ -14,6 +14,7 @@ from app.services.leads import (
     LeadNotFound,
     create_lead,
     get_lead_detail,
+    list_leads,
 )
 from app.services.storage import StorageService
 
@@ -51,6 +52,16 @@ async def submit_lead(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return LeadRead.model_validate(lead)
+
+
+@router.get("", response_model=list[LeadRead])
+def list_all_leads(
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+) -> list[LeadRead]:
+    leads = list_leads(db, limit=limit, offset=offset)
+    return [LeadRead.model_validate(lead) for lead in leads]
 
 
 @router.get("/{lead_id}", response_model=LeadDetail)

@@ -4,6 +4,7 @@ import os
 import uuid
 from typing import BinaryIO, Protocol
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -96,6 +97,16 @@ def get_lead(db: Session, lead_id: uuid.UUID) -> Lead:
     if lead is None:
         raise LeadNotFound(str(lead_id))
     return lead
+
+
+def list_leads(db: Session, limit: int = 50, offset: int = 0) -> list[Lead]:
+    stmt = (
+        select(Lead)
+        .order_by(Lead.created_at.desc(), Lead.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(db.execute(stmt).scalars().all())
 
 
 def get_lead_detail(db: Session, storage: Storage, lead_id: uuid.UUID) -> LeadDetail:
