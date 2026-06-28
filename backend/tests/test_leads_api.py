@@ -102,3 +102,45 @@ def test_list_leads_pagination(client):
     resp = client.get("/api/leads?limit=2&offset=0")
     assert resp.status_code == 200
     assert len(resp.json()) == 2
+
+
+def test_patch_lead_marks_reached_out(client):
+    created = client.post("/api/leads", data=_fields(), files=_multipart()).json()
+    assert created["state"] == "PENDING"
+
+    resp = client.patch(f"/api/leads/{created['id']}", json={"state": "REACHED_OUT"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["state"] == "REACHED_OUT"
+
+    # persisted: subsequent GET reflects new state
+    detail = client.get(f"/api/leads/{created['id']}").json()
+    assert detail["state"] == "REACHED_OUT"
+
+
+def test_patch_lead_invalid_transition_returns_409(client):
+    created = client.post("/api/leads", data=_fields(), files=_multipart()).json()
+    client.patch(f"/api/leads/{created['id']}", json={"state": "REACHED_OUT"})
+
+    # already REACHED_OUT -> REACHED_OUT is invalid
+    resp = client.patch(f"/api/leads/{created['id']}", json={"state": "REACHED_OUT"})
+    assert resp.status_code == 409
+    assert "detail" in resp.json()
+
+
+def test_patch_lead_back_to_pending_returns_409(client):
+    created = client.post("/api/leads", data=_fields(), files=_multipart()).json()
+    client.patch(f"/api/leads/{created['id']}", json={"state": "REACHED_OUT"})
+
+    resp = client.patch(f"/api/leads/{created['id']}", json={"state": "PENDING"})
+    assert resp.status_code == 409
+
+
+def test_patch_lead_not_found_returns_404(client):
+    resp = client.patch(f"/api/leads/{uuid.uuid4()}", json={"state": "REACHED_OUT"})
+    assert resp.status_code == 404
+
+
+def test_patch_lead_invalid_state_value_returns_422(client):
+    created = client.post("/api/leads", data=_fields(), files=_multipart()).json()
+    resp = client.patch(f"/api/leads/{created['id']}", json={"state": "BOGUS"})
+    assert resp.status_code == 422

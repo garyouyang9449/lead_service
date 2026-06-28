@@ -7,10 +7,12 @@ from app.schemas.lead import LeadCreate
 from app.models.lead import LeadState
 from app.services.leads import (
     FileValidationError,
+    InvalidStateTransition,
     LeadNotFound,
     create_lead,
     get_lead_detail,
     list_leads,
+    update_lead_state,
     validate_resume,
 )
 
@@ -151,3 +153,45 @@ def test_list_leads_respects_limit_and_offset(db_session, fake_storage):
     page = list_leads(db_session, limit=1, offset=1)
 
     assert [l.id for l in page] == [b.id]
+
+
+# ---- update_lead_state ----
+
+def test_update_lead_state_pending_to_reached_out(db_session, fake_storage):
+    lead = _make(db_session, fake_storage, "alice")
+    assert lead.state == LeadState.PENDING
+
+    updated = update_lead_state(db_session, lead.id, LeadState.REACHED_OUT)
+
+    assert updated.state == LeadState.REACHED_OUT
+    # persisted
+    db_session.refresh(lead)
+    assert lead.state == LeadState.REACHED_OUT
+
+
+def test_update_lead_state_rejects_reached_out_to_pending(db_session, fake_storage):
+    lead = _make(db_session, fake_storage, "alice")
+    update_lead_state(db_session, lead.id, LeadState.REACHED_OUT)
+
+    with pytest.raises(InvalidStateTransition):
+        update_lead_state(db_session, lead.id, LeadState.PENDING)
+
+
+def test_update_lead_state_rejects_reached_out_to_reached_out(db_session, fake_storage):
+    lead = _make(db_session, fake_storage, "alice")
+    update_lead_state(db_session, lead.id, LeadState.REACHED_OUT)
+
+    with pytest.raises(InvalidStateTransition):
+        update_lead_state(db_session, lead.id, LeadState.REACHED_OUT)
+
+
+def test_update_lead_state_rejects_pending_to_pending(db_session, fake_storage):
+    lead = _make(db_session, fake_storage, "alice")
+
+    with pytest.raises(InvalidStateTransition):
+        update_lead_state(db_session, lead.id, LeadState.PENDING)
+
+
+def test_update_lead_state_missing_lead_raises(db_session, fake_storage):
+    with pytest.raises(LeadNotFound):
+        update_lead_state(db_session, uuid.uuid4(), LeadState.REACHED_OUT)

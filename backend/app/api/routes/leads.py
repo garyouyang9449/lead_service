@@ -8,13 +8,15 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_storage
-from app.schemas.lead import LeadCreate, LeadDetail, LeadRead
+from app.schemas.lead import LeadCreate, LeadDetail, LeadRead, LeadStateUpdate
 from app.services.leads import (
     FileValidationError,
+    InvalidStateTransition,
     LeadNotFound,
     create_lead,
     get_lead_detail,
     list_leads,
+    update_lead_state,
 )
 from app.services.storage import StorageService
 
@@ -74,6 +76,21 @@ def read_lead(
         return get_lead_detail(db, storage, lead_id)
     except LeadNotFound as exc:
         raise HTTPException(status_code=404, detail="Lead not found.") from exc
+
+
+@router.patch("/{lead_id}", response_model=LeadRead)
+def patch_lead(
+    lead_id: uuid.UUID,
+    payload: LeadStateUpdate,
+    db: Session = Depends(get_db),
+) -> LeadRead:
+    try:
+        lead = update_lead_state(db, lead_id, payload.state)
+    except LeadNotFound as exc:
+        raise HTTPException(status_code=404, detail="Lead not found.") from exc
+    except InvalidStateTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return LeadRead.model_validate(lead)
 
 
 def _first_error(exc: ValidationError) -> str:

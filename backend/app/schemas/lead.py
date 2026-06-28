@@ -16,6 +16,12 @@ class LeadCreate(BaseModel):
     email: EmailStr
 
 
+class LeadStateUpdate(BaseModel):
+    """Attorney-driven state change."""
+
+    state: LeadState
+
+
 class LeadRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

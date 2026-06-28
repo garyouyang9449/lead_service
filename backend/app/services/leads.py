@@ -29,6 +29,17 @@ class LeadNotFound(Exception):
     """No lead exists for the requested id."""
 
 
+class InvalidStateTransition(Exception):
+    """Requested lead state change is not allowed."""
+
+
+# Allowed state machine: only PENDING -> REACHED_OUT.
+ALLOWED_TRANSITIONS: dict[LeadState, set[LeadState]] = {
+    LeadState.PENDING: {LeadState.REACHED_OUT},
+    LeadState.REACHED_OUT: set(),
+}
+
+
 class Storage(Protocol):
     def upload(self, key: str, fileobj: BinaryIO, content_type: str) -> None: ...
     def presigned_url(self, key: str) -> str: ...
@@ -113,3 +124,17 @@ def get_lead_detail(db: Session, storage: Storage, lead_id: uuid.UUID) -> LeadDe
     lead = get_lead(db, lead_id)
     url = storage.presigned_url(lead.resume_key)
     return LeadDetail.model_validate({**lead.__dict__, "resume_url": url})
+
+
+def update_lead_state(
+    db: Session, lead_id: uuid.UUID, new_state: LeadState
+) -> Lead:
+    lead = get_lead(db, lead_id)
+    if new_state not in ALLOWED_TRANSITIONS[lead.state]:
+        raise InvalidStateTransition(
+            f"Cannot transition from {lead.state.value} to {new_state.value}."
+        )
+    lead.state = new_state
+    db.commit()
+    db.refresh(lead)
+    return lead
