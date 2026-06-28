@@ -18,7 +18,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db, get_email, get_storage
 from app.models.user import User
 from app.schemas.lead import LeadCreate, LeadDetail, LeadRead, LeadStateUpdate
-from app.services.email import EmailService, render_prospect_confirmation
+from app.core.config import settings
+from app.services.email import (
+    EmailService,
+    render_attorney_notification,
+    render_prospect_confirmation,
+)
 from app.services.leads import (
     FileValidationError,
     InvalidStateTransition,
@@ -69,7 +74,11 @@ async def submit_lead(
     background_tasks.add_task(
         mailer.send, lead.email, prospect_subject, prospect_body
     )
-    # TODO: notify the internal attorney of the new lead submission.
+
+    attorney_subject, attorney_body = render_attorney_notification(lead)
+    background_tasks.add_task(
+        mailer.send, settings.attorney_email, attorney_subject, attorney_body
+    )
 
     return LeadRead.model_validate(lead)
 

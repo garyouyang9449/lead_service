@@ -32,7 +32,31 @@ def test_create_lead_sends_prospect_confirmation_email(client, fake_email):
     assert resp.status_code == 201, resp.text
 
     recipients = [to for to, _, _ in fake_email.sent]
-    assert recipients == ["ada@calc.org"]
+    assert "ada@calc.org" in recipients
+
+
+def test_create_lead_notifies_attorney(client, fake_email):
+    from app.core.config import settings
+
+    resp = client.post(
+        "/api/leads", data=_fields(email="ada@calc.org"), files=_multipart()
+    )
+    assert resp.status_code == 201, resp.text
+
+    # Two emails: prospect confirmation + attorney notification.
+    recipients = [to for to, _, _ in fake_email.sent]
+    assert recipients == ["ada@calc.org", settings.attorney_email]
+
+    # The attorney message contains the prospect's details.
+    attorney_msgs = [
+        (subject, body)
+        for to, subject, body in fake_email.sent
+        if to == settings.attorney_email
+    ]
+    assert len(attorney_msgs) == 1
+    subject, body = attorney_msgs[0]
+    assert "Ada Lovelace" in subject
+    assert "ada@calc.org" in body
 
 
 def test_create_lead_rejects_bad_extension(client):
