@@ -14,7 +14,6 @@
 
 - **Backend commands run from `backend/`** unless stated. Use a virtualenv: `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`.
 - **Frontend commands run from `frontend/`**.
-- After each task's tests pass, **commit** with the message shown.
 - Do not invent APIs not defined here. Every type/function used is defined in an earlier task.
 - Tests use a **separate test Postgres DB**; storage and email are **mocked** in unit/API tests (no live MinIO/SMTP needed to run pytest).
 
@@ -166,13 +165,6 @@ services:
 volumes:
   pgdata:
   miniodata:
-```
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add .gitignore .env.example docker-compose.yml
-git commit -m "chore: scaffold repo with docker-compose for db, storage, mail"
 ```
 
 ---
@@ -331,12 +323,7 @@ EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 ```
 
-- [ ] **Step 9: Add empty `backend/app/__init__.py` and `backend/tests/__init__.py`, then commit**
-
-```bash
-git add backend/
-git commit -m "feat: backend skeleton with config, logging, health endpoint"
-```
+- [ ] **Step 9: Add empty `backend/app/__init__.py` and `backend/tests/__init__.py`**
 
 ---
 
@@ -534,13 +521,6 @@ def test_user_fields():
 Run: `cd backend && pytest tests/test_models.py -v`
 Expected: PASS
 
-- [ ] **Step 10: Commit**
-
-```bash
-git add backend/
-git commit -m "feat: add Lead and User models with Alembic migration"
-```
-
 ---
 
 ## Task 3: Security — password hashing + JWT
@@ -616,13 +596,6 @@ def decode_token(token: str) -> dict | None:
 
 Run: `cd backend && pytest tests/test_security.py -v`
 Expected: PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add backend/app/core/security.py backend/tests/test_security.py
-git commit -m "feat: add password hashing and JWT helpers"
-```
 
 ---
 
@@ -709,13 +682,6 @@ class StorageService:
 
 Run: `cd backend && pytest tests/test_storage.py -v`
 Expected: PASS
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add backend/app/services/storage.py backend/app/services/__init__.py backend/tests/test_storage.py
-git commit -m "feat: add S3/MinIO storage service"
-```
 
 ---
 
@@ -810,13 +776,6 @@ class EmailService:
 Run: `cd backend && pytest tests/test_email.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add backend/app/services/email.py backend/tests/test_email.py
-git commit -m "feat: add SMTP email service for lead notifications"
-```
-
 ---
 
 ## Task 6: Schemas
@@ -881,12 +840,7 @@ class UserRead(BaseModel):
     model_config = {"from_attributes": True}
 ```
 
-- [ ] **Step 3: Create empty `backend/app/schemas/__init__.py` and commit**
-
-```bash
-git add backend/app/schemas/
-git commit -m "feat: add Pydantic schemas for leads and auth"
-```
+- [ ] **Step 3: Create empty `backend/app/schemas/__init__.py`**
 
 ---
 
@@ -1006,13 +960,6 @@ def transition_state(db: Session, lead: Lead, new_state: LeadState) -> Lead:
 Run: `cd backend && pytest tests/test_leads_service.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add backend/app/services/leads.py backend/tests/test_leads_service.py
-git commit -m "feat: add leads service with state-machine guard"
-```
-
 ---
 
 ## Task 8: Auth service
@@ -1088,13 +1035,6 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
 Run: `cd backend && pytest tests/test_auth_service.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add backend/app/services/auth.py backend/tests/test_auth_service.py
-git commit -m "feat: add auth service for credential verification"
-```
-
 ---
 
 ## Task 9: API dependencies (DB, current user, services)
@@ -1144,12 +1084,7 @@ def get_current_user(
     return user
 ```
 
-- [ ] **Step 2: Create empty `backend/app/api/__init__.py` and `backend/app/api/routes/__init__.py`, then commit**
-
-```bash
-git add backend/app/api/
-git commit -m "feat: add API dependencies for auth and services"
-```
+- [ ] **Step 2: Create empty `backend/app/api/__init__.py` and `backend/app/api/routes/__init__.py`**
 
 ---
 
@@ -1289,13 +1224,6 @@ def test_me_with_token(client, seeded_user):
 
 Run: `cd backend && pytest tests/test_auth_api.py -v`
 Expected: PASS
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add backend/app/main.py backend/app/api/routes/auth.py backend/tests/conftest.py backend/tests/test_auth_api.py
-git commit -m "feat: add login and me auth endpoints"
-```
 
 ---
 
@@ -1508,13 +1436,6 @@ Expected: PASS
 Run: `cd backend && pytest -v`
 Expected: all PASS
 
-- [ ] **Step 6: Commit**
-
-```bash
-git add backend/app/main.py backend/app/api/routes/leads.py backend/tests/test_leads_api.py
-git commit -m "feat: add public lead creation and internal lead management endpoints"
-```
-
 ---
 
 ## Task 12: Startup — bucket + DB seed wiring
@@ -1587,13 +1508,6 @@ Expected: PASS
 
 Run: `cd backend && pytest -v`
 Expected: all PASS
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add backend/app/db/seed.py backend/app/main.py backend/tests/test_seed.py
-git commit -m "feat: seed default attorney and ensure storage bucket on startup"
-```
 
 ---
 
@@ -1789,13 +1703,6 @@ CMD ["node", "server.js"]
 Run: `cd frontend && npm install && npx tsc --noEmit`
 Expected: no type errors.
 
-- [ ] **Step 9: Commit**
-
-```bash
-git add frontend/
-git commit -m "feat: scaffold Next.js app with API client and auth helpers"
-```
-
 ---
 
 ## Task 14: Public lead submission form (`/`)
@@ -1858,13 +1765,6 @@ export default function HomePage() {
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
-
-```bash
-git add frontend/app/page.tsx
-git commit -m "feat: public lead submission form"
-```
-
 ---
 
 ## Task 15: Login page (`/login`)
@@ -1918,12 +1818,10 @@ export default function LoginPage() {
 }
 ```
 
-- [ ] **Step 2: Typecheck and commit**
+- [ ] **Step 2: Typecheck**
 
 ```bash
 cd frontend && npx tsc --noEmit
-git add frontend/app/login/page.tsx
-git commit -m "feat: attorney login page"
 ```
 
 ---
@@ -2033,13 +1931,6 @@ export default function LeadDetailPage() {
 Run: `cd frontend && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
-
-```bash
-git add frontend/app/leads/
-git commit -m "feat: guarded leads list and detail pages with state transition"
-```
-
 ---
 
 ## Task 17: README + end-to-end smoke verification
@@ -2103,13 +1994,6 @@ Expected: `{"status":"ok"}`. Then manually walk the flow in the README and confi
 - Lead submission returns success on the form.
 - Two emails appear in Mailpit.
 - Login works; lead appears; resume downloads; "Mark as Reached Out" flips state.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add README.md
-git commit -m "docs: add README with run and verification instructions"
-```
 
 ---
 
