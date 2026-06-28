@@ -15,6 +15,7 @@
 - **Backend commands run from `backend/`** unless stated. Use a virtualenv: `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"`.
 - **Frontend commands run from `frontend/`**.
 - Do not invent APIs not defined here. Every type/function used is defined in an earlier task.
+- **Do NOT add any comments to the code.** Write zero inline comments, block comments, docstrings, or explanatory annotations in any source file (`.py`, `.ts`, `.tsx`, `.js`, etc.). The code samples below are the exact spec — reproduce them with all comments stripped. The only exception is functional tooling directives (e.g. `# noqa`) where required to keep linters/tools happy.
 - Tests use a **separate test Postgres DB**; storage and email are **mocked** in unit/API tests (no live MinIO/SMTP needed to run pytest).
 
 ---
@@ -429,7 +430,6 @@ class Base(DeclarativeBase):
     pass
 
 
-# Import models so Alembic autogenerate + Base.metadata see them.
 from app.models.lead import Lead  # noqa: E402,F401
 from app.models.user import User  # noqa: E402,F401
 ```
@@ -506,7 +506,6 @@ def test_lead_defaults_to_pending():
         first_name="A", last_name="B", email="a@b.com",
         resume_key="k", resume_filename="cv.pdf",
     )
-    # default applied at flush time; check the enum value exists
     assert LeadState.PENDING.value == "PENDING"
     assert lead.first_name == "A"
 
@@ -705,7 +704,6 @@ def test_send_lead_emails_sends_two_messages():
         svc.send_lead_notifications(
             prospect_email="p@x.com", first_name="Jane", last_name="Doe"
         )
-        # one to prospect, one to attorney
         assert instance.send_message.call_count == 2
 ```
 
@@ -767,7 +765,7 @@ class EmailService:
             with smtplib.SMTP(self._host, self._port) as server:
                 server.send_message(prospect)
                 server.send_message(attorney)
-        except Exception:  # noqa: BLE001 — email failures must not break submission
+        except Exception:  # noqa: BLE001
             logger.exception("Failed to send lead notification emails")
 ```
 
@@ -909,7 +907,6 @@ from sqlalchemy.orm import Session
 
 from app.models.lead import Lead, LeadState
 
-# Allowed state transitions.
 _ALLOWED = {
     LeadState.PENDING: {LeadState.REACHED_OUT},
     LeadState.REACHED_OUT: set(),
@@ -1209,7 +1206,7 @@ def test_login_bad_password_returns_401(client, seeded_user):
 
 
 def test_me_requires_token(client, seeded_user):
-    assert client.get("/api/auth/me").status_code == 403  # no bearer => HTTPBearer 403
+    assert client.get("/api/auth/me").status_code == 403
 
 
 def test_me_with_token(client, seeded_user):
@@ -1420,7 +1417,6 @@ def test_list_and_patch_flow(client, seeded_user):
     assert patched.status_code == 200
     assert patched.json()["state"] == "REACHED_OUT"
 
-    # second transition is invalid
     again = client.patch(f"/api/leads/{lead_id}",
                          json={"state": "PENDING"}, headers=headers)
     assert again.status_code == 409
@@ -1500,7 +1496,7 @@ Expected: PASS
             db.close()
         try:
             StorageService.from_settings().ensure_bucket()
-        except Exception:  # noqa: BLE001 — storage may be unavailable in some envs
+        except Exception:  # noqa: BLE001
             pass
 ```
 
@@ -1570,7 +1566,6 @@ Expected: all PASS
 - [ ] **Step 3: Create `frontend/next.config.js`**
 
 ```js
-/** @type {import('next').NextConfig} */
 module.exports = { output: "standalone" };
 ```
 
